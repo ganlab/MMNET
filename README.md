@@ -91,7 +91,7 @@ pip install -r requirements.txt
       --windows_chr   # the number of chromosomes in a window
   ```
 
-​	Although we provide recommended [parameter settings](save/parameter_to_train_MMNet.md), considering differences in hardware, users are advised to carefully determine these parameters based on error variations during training. 
+​	Although we provide recommended [parameter settings](save/parameter_to_train_MMNet.md), considering differences in hardware, users are advised to carefully determine these parameters based on loss during training. 
 
 ​	**Tips:** Different stride parameter values, when combined with different Genotype files, result in varying data dimensions. Please adjust the parameters in the upper branch of the VE module `(models/*/ve_embedding.py)` according to the actual situation.
 
