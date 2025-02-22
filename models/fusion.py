@@ -1,15 +1,16 @@
 import torch
-from genetic_relatedness_embedding import *
 from ve_embedding import *
+from esn_embedding import *
+
 
 class Fusion(nn.Module):
-    def __init__(self, snp_size, grm_size, p_snp_upper, p_snp_lower, p_grm, p_fusion, stride=3):
+    def __init__(self, snp_size, genetic_relatedness_size, p_snp_upper, p_snp_lower, p_genetic_relatedness, p_fusion, stride=3):
         super(Fusion, self).__init__()
         self.ve_upper = VEUpperBranch(p_snp_upper, stride=stride)
         self.ve_lower = VELowerBranch(snp_size, p_snp_lower)
         self.weight = nn.Parameter(torch.Tensor([0.5, 0.5]))
 
-        self.esn = GeneticRelatednessEmbedding(grm_size, p_grm)
+        self.esn = GeneticRelatednessEmbedding(genetic_relatedness_size, p_genetic_relatedness)
 
         self.snp_output = nn.Sequential(
             nn.LeakyReLU(negative_slope=0.05),
@@ -39,15 +40,15 @@ class Fusion(nn.Module):
             nn.Linear(512, 1),
         )
 
-    def forward(self, snp, grm):
+    def forward(self, snp, genetic_relatedness):
         snp_embedding_upper = self.ve_upper(snp)
         snp_embedding_lower = self.ve_lower(snp)
         weight = torch.softmax(self.weight, dim=-1)
         snp_embedding = weight[0] * snp_embedding_upper + weight[1] * snp_embedding_lower
-        grm_embedding = self.esn(grm)
+        genetic_relatedness_embedding = self.esn(genetic_relatedness)
         snp_output = self.snp_output(snp_embedding)
-        sim_output = self.sim_output(grm_embedding)
-        fusion_output = self.fusion(torch.cat([snp_embedding, grm_embedding], dim=-1))
+        sim_output = self.sim_output(genetic_relatedness_embedding)
+        fusion_output = self.fusion(torch.cat([snp_embedding, genetic_relatedness_embedding], dim=-1))
         return snp_output, sim_output, fusion_output
 
 if __name__ == '__main__':
