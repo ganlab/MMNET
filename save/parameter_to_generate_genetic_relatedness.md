@@ -1,4 +1,4 @@
-#### Parameter to generate genetic_relatedness
+#### Parameter to generate genetic relatedness
 
 - In practical engineering, the number of training epochs and the dropout rate p in the network need to be determined based on the loss of the training and validation sets. The goal is not to achieve the optimal performance of the Backbone Siamese network but to ensure that the distribution of the model's embedding representations in the feature space does not exhibit extreme overfitting or underfitting. 
 
