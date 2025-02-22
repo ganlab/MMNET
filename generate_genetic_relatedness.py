@@ -2,13 +2,23 @@ import torch
 from torch import nn
 import pandas as pd
 from torch.utils.data import DataLoader, TensorDataset
-from models.backbone_Siamese import Net
+from models.normal.backbone_Siamese import Net
+from models.chr.backbone_Siamese import ChrNet
 import numpy as np
 import random
 import argparse
+from collections import Counter
+
+def calculate_snp_number(genotype):
+    chr_snp_list = list(genotype.columns)
+    chr_list = [item.split('_')[0] for item in chr_snp_list]
+    chr_counter = Counter(chr_list)
+    return chr_counter
 
 def get_data(genotype_path, phenotype_path, train_val_ids_path):
     genotype = pd.read_csv(genotype_path, index_col=0)
+    count = calculate_snp_number(genotype)
+    count = list(count.values())
     phenotype = pd.read_csv(phenotype_path, index_col=0)
     with open(train_val_ids_path + "train_ids.txt", 'r') as f:
         train_ids = f.read().split(",")
@@ -26,7 +36,7 @@ def get_data(genotype_path, phenotype_path, train_val_ids_path):
     snp_val = snp_val.reshape(snp_val.shape[0], 1, -1)
     phen_train = torch.tensor(phen_train.values, dtype=torch.float).unsqueeze(1)
     phen_val = torch.tensor(phen_val.values, dtype=torch.float).unsqueeze(1)
-    return all_sample, snp_train, phen_train, snp_val, phen_val
+    return all_sample, snp_train, phen_train, snp_val, phen_val, count
 
 def extract_embedding(best_model, genotype_path, phenotype_path):
     # extract feature inputs
@@ -36,6 +46,7 @@ def extract_embedding(best_model, genotype_path, phenotype_path):
     feature = data_merge.iloc[:, :-1]
     index = feature.index
     feature = torch.tensor(feature.values, dtype=torch.float)
+    feature = feature.reshape(feature.shape[0], 1, -1)
 
     # extract embedding
     best_model.eval()
@@ -45,6 +56,7 @@ def extract_embedding(best_model, genotype_path, phenotype_path):
             end = min(start + 1024, feature.size()[0])
             embeddings.append(best_model.embedding(feature[start:end]).numpy())
     embeddings = np.concatenate(embeddings, axis=0)
+    embeddings = embeddings.reshape(embeddings.shape[0], -1)
     return pd.DataFrame(embeddings, index=index)
 
 def generate_genetic_relatedness(df, genetic_relatedness_path, epoch):
@@ -66,7 +78,7 @@ if __name__ == '__main__':
     parser.add_argument("--train_val_ids_path", type=str, default="data/train_val_test/", help = "Path to the directory containing training, validation, and test set indices")
 
     # training parameters
-    parser.add_argument("--epoch", type=int, default=30, help = "Number of iterations")
+    parser.add_argument("--epoch", type=int, default=100, help = "Number of iterations")
     parser.add_argument("--p", type=float, default=0.8, help = "Dropout rate")
     parser.add_argument("--batch_size", type=int, default=128, help = "Number of samples per batch during training")
     parser.add_argument("--lr", type=float, default=0.01, help = "Initial learning rate for the optimizer")
@@ -75,9 +87,13 @@ if __name__ == '__main__':
     parser.add_argument("--patience", type=int, default=3, help = "Number of consecutive epochs without improvement before reducing the learning rate")
 
     # path to save genetic_relatedness
-    parser.add_argument("--genetic_relatedness_path", type=str, default="data/", help = "Path to save the generated genetic_relatedness")
+    parser.add_argument("--genetic_relatedness_path", type=str, default="data/", help = "Path to save the generated genetic relatedness")
+
+    # split
+    parser.add_argument("--windows_mechanism", type=int, default=0, help = "Windows mechanism 0: don't use windows_mechanism, 1: windows_mechanism by chromosome")
+    parser.add_argument("--windows_chr", type=int, default=2, help = "the number of chromosomes in a window")
     args = parser.parse_args()
-    print(args)
+
     # define seed
     seed = 5
     random.seed(seed)
@@ -88,12 +104,17 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
 
     # create DataLoader
-    all_sample_tensor, snp_train_tensor, phen_train_tensor, snp_val_tensor, phen_val_tensor = get_data(args.genotype_path, args.phenotype_path, args.train_val_ids_path)
+    all_sample_tensor, snp_train_tensor, phen_train_tensor, snp_val_tensor, phen_val_tensor, count = get_data(args.genotype_path, args.phenotype_path, args.train_val_ids_path)
     train_dataloader = DataLoader(TensorDataset(snp_train_tensor, phen_train_tensor), batch_size=args.batch_size, shuffle=True, drop_last=True)
     val_dataloader = DataLoader(TensorDataset(snp_val_tensor, phen_val_tensor), batch_size=args.batch_size, shuffle=False)
 
     # define model
-    model = Net(snp_train_tensor.size()[-1], args.p)
+    if args.windows_mechanism == 0:
+        model = Net(snp_train_tensor.size()[-1], args.p)
+    elif args.windows_mechanism == 1:
+        model = ChrNet(args.p, args.windows_chr, count)
+    else:
+        model = Net(snp_train_tensor.size()[-1], args.p)
     loss_fn = nn.L1Loss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=args.factor, patience=args.patience)

@@ -1,6 +1,7 @@
 import sys
+sys.path.append("models/chr")
+sys.path.append("models/normal")
 
-sys.path.append("./models")
 
 import torch
 from torch import nn
@@ -10,8 +11,17 @@ import numpy as np
 import random
 import argparse
 from sklearn.metrics import r2_score
-from models.fusion import Fusion
+from models.normal.fusion import NormalFusion
+from models.chr.fusion import ChrFusion
 from evaluate_contribution import evaluate_contribution, write_contribution
+from collections import Counter
+
+
+def calculate_snp_number(genotype):
+    chr_snp_list = list(genotype.columns)
+    chr_list = [item.split('_')[0] for item in chr_snp_list]
+    chr_counter = Counter(chr_list)
+    return chr_counter
 
 
 def split_train_val_test(data, train_ids, val_ids, test_ids):
@@ -32,11 +42,13 @@ def split_train_val_test(data, train_ids, val_ids, test_ids):
     Y_train = torch.tensor(Y_train.values, dtype=torch.float).unsqueeze(1)
     Y_val = torch.tensor(Y_val.values, dtype=torch.float).unsqueeze(1)
     Y_test = torch.tensor(Y_test.values, dtype=torch.float).unsqueeze(1)
-    return X_train, Y_train, X_val, Y_val, X_test, Y_test
+    return  X_train, Y_train, X_val, Y_val, X_test, Y_test
 
 
 def get_data(genotype_path, genetic_relatedness_path, phenotype_path, train_val_ids_path):
     genotype = pd.read_csv(genotype_path, index_col=0)
+    count = calculate_snp_number(genotype)
+    count = list(count.values())
     genetic_relatedness = pd.read_csv(genetic_relatedness_path, index_col=0)
     phenotype = pd.read_csv(phenotype_path, index_col=0)
     with open(train_val_ids_path + "train_ids.txt", 'r') as f:
@@ -49,51 +61,43 @@ def get_data(genotype_path, genetic_relatedness_path, phenotype_path, train_val_
     phenotype_genotype = pd.merge(phenotype, genotype, left_index=True, right_index=True)
     phenotype_genetic_relatedness = pd.merge(phenotype, genetic_relatedness, left_index=True, right_index=True)
     # split data
-    snp_train_tensor, phen_train_tensor, snp_val_tensor, phen_val_tensor, snp_test_tensor, phen_test_tensor = split_train_val_test(
-        phenotype_genotype, train_ids, val_ids, test_ids)
-    genetic_relatedness_train_tensor, _, genetic_relatedness_val_tensor, _, genetic_relatedness_test_tensor, _ = split_train_val_test(
-        phenotype_genetic_relatedness, train_ids, val_ids, test_ids)
+    snp_train_tensor, phen_train_tensor, snp_val_tensor, phen_val_tensor, snp_test_tensor, phen_test_tensor = split_train_val_test(phenotype_genotype, train_ids,val_ids, test_ids)
+    genetic_relatedness_train_tensor, _, genetic_relatedness_val_tensor, _, genetic_relatedness_test_tensor, _ = split_train_val_test(phenotype_genetic_relatedness, train_ids, val_ids, test_ids)
     return snp_train_tensor, genetic_relatedness_train_tensor, phen_train_tensor, \
         snp_val_tensor, genetic_relatedness_val_tensor, phen_val_tensor, \
         snp_test_tensor, genetic_relatedness_test_tensor, phen_test_tensor, \
         torch.tensor(phenotype_genotype.iloc[:, 1:].values, dtype=torch.float), \
-        torch.tensor(phenotype_genetic_relatedness.iloc[:, 1:].values, dtype=torch.float)
+        torch.tensor(phenotype_genetic_relatedness.iloc[:, 1:].values, dtype=torch.float), count
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="MMNet")
     # dataset parameters
-    parser.add_argument("--genetic_relatedness_epoch", type=int, default=30,
-                        help="The epoch number used to generate and save the genetic relatedness")
-    parser.add_argument("--genotype_path", type=str, default="data/Genotype.csv",
-                        help="Path to the genotype data file (CSV format)")
-    parser.add_argument("--genetic_relatedness_path", type=str, default="data/",
-                        help="Path to the generated genetic_relatedness")
-    parser.add_argument("--phenotype_path", type=str, default="data/Phenotype.csv",
-                        help="Path to the phenotype data file (CSV format)")
-    parser.add_argument("--train_val_ids_path", type=str, default="data/train_val_test/",
-                        help="Path to the directory containing training, validation, and test set indices")
+    parser.add_argument("--genetic_relatedness_epoch", type=int, default=30, help = "The epoch number used to generate and save the genetic relatedness")
+    parser.add_argument("--genotype_path", type=str, default="data/Genotype.csv", help= "Path to the genotype data file (CSV format)")
+    parser.add_argument("--genetic_relatedness_path", type=str, default="data/", help = "Path to the generated genetic_relatedness")
+    parser.add_argument("--phenotype_path", type=str, default="data/Phenotype.csv", help = "Path to the phenotype data file (CSV format)")
+    parser.add_argument("--train_val_ids_path", type=str, default="data/train_val_test/", help = "Path to the directory containing training, validation, and test set indices")
 
     # training parameters
-    parser.add_argument("--epoch", type=int, default=30, help="Number of iterations")
-    parser.add_argument("--p_ve_upper", type=float, default=0.8, help="The dropout rate for the upper branch of the VE")
-    parser.add_argument("--p_ve_lower", type=float, default=0.8, help="The dropout rate for the lower branch of the VE")
-    parser.add_argument("--p_genetic_relatedness", type=float, default=0.8, help="The dropout rate for the ESN ")
-    parser.add_argument("--p_fusion", type=float, default=0.8, help="The dropout rate for the Fusion module")
-    parser.add_argument("--k", type=int, default=2,
-                        help="The number of top-performing models (based on validation performance) to average for evaluation")
-    parser.add_argument("--stride", type=int, default=3,
-                        help="The stride for the first convolutional layer in the upper branch of the VE")
-    parser.add_argument("--batch_size", type=int, default=128, help="Number of samples per batch during training")
-    parser.add_argument("--lr", type=float, default=0.01, help="Initial learning rate for the optimizer")
-    parser.add_argument("--weight_decay", type=float, default=1e-5,
-                        help="L2 regularization strength to prevent overfitting")
-    parser.add_argument("--factor", type=float, default=0.5,
-                        help="Factor by which the learning rate is reduced when performance plateaus")
-    parser.add_argument("--patience", type=int, default=3,
-                        help="Number of consecutive epochs without improvement before reducing the learning rate")
-    parser.add_argument("--monitor", type=str, default='train_loss',
-                        help="The metric to monitor (train_loss or val_loss)")
+    parser.add_argument("--epoch", type=int, default=30, help = "Number of iterations")
+    parser.add_argument("--p_ve_upper", type=float, default=0.8, help = "The dropout rate for the upper branch of the VE")
+    parser.add_argument("--p_ve_lower", type=float, default=0.8, help = "The dropout rate for the lower branch of the VE")
+    parser.add_argument("--p_genetic_relatedness", type=float, default=0.8, help = "The dropout rate for the ESN ")
+    parser.add_argument("--p_fusion", type=float, default=0.8, help = "The dropout rate for the Fusion module")
+    parser.add_argument("--k", type=int, default=2, help = "The number of top-performing models (based on validation performance) to average for evaluation")
+    parser.add_argument("--stride", type=int, default=3, help = "The stride for the first convolutional layer in the upper branch of the VE")
+    parser.add_argument("--batch_size", type=int, default=128, help = "Number of samples per batch during training")
+    parser.add_argument("--lr", type=float, default=0.01, help = "Initial learning rate for the optimizer")
+    parser.add_argument("--weight_decay", type=float, default=1e-5, help = "L2 regularization strength to prevent overfitting")
+    parser.add_argument("--factor", type=float, default=0.5, help = "Factor by which the learning rate is reduced when performance plateaus")
+    parser.add_argument("--patience", type=int, default=3, help = "Number of consecutive epochs without improvement before reducing the learning rate")
+    parser.add_argument("--monitor", type=str, default='train_loss', help = "The metric to monitor (train_loss or val_loss)")
+
+    # Windows
+    parser.add_argument("--windows_mechanism", type=int, default=0, help = "Windows mechanism 0: don't use windows_mechanism, 1: windows_mechanism by chromosome")
+    parser.add_argument("--windows_size", type=int, default=2, help = "Windows size")
     args = parser.parse_args()
     print(args)
 
@@ -107,29 +111,46 @@ if __name__ == '__main__':
     torch.backends.cudnn.deterministic = True
 
     # create DataLoader
-    snp_train, genetic_relatedness_train, phen_train, snp_val, genetic_relatedness_val, phen_val, snp_test, genetic_relatedness_test, phen_test, pca_snp, pca_genetic_relatedness = get_data(
-        args.genotype_path,
-        args.genetic_relatedness_path + str(args.genetic_relatedness_epoch) + ".csv",
-        args.phenotype_path,
-        args.train_val_ids_path)
-    train_dataloader = DataLoader(TensorDataset(snp_train, genetic_relatedness_train, phen_train),
-                                  batch_size=args.batch_size, shuffle=True, drop_last=True)
-    val_dataloader = DataLoader(TensorDataset(snp_val, genetic_relatedness_val, phen_val), batch_size=args.batch_size,
-                                shuffle=True)
-    test_dataloader = DataLoader(TensorDataset(snp_test, genetic_relatedness_test, phen_test),
-                                 batch_size=args.batch_size, shuffle=True)
+    snp_train, genetic_relatedness_train, phen_train, snp_val, genetic_relatedness_val, phen_val, snp_test, genetic_relatedness_test, phen_test, pca_snp, pca_genetic_relatedness, count  = get_data(args.genotype_path,
+                                                                                                                               args.genetic_relatedness_path + str(args.genetic_relatedness_epoch) + ".csv",
+                                                                                                                               args.phenotype_path,
+                                                                                                                               args.train_val_ids_path)
+    train_dataloader = DataLoader(TensorDataset(snp_train, genetic_relatedness_train, phen_train), batch_size=args.batch_size, shuffle=True, drop_last=True)
+    val_dataloader = DataLoader(TensorDataset(snp_val, genetic_relatedness_val, phen_val), batch_size=args.batch_size, shuffle=True)
+    test_dataloader = DataLoader(TensorDataset(snp_test, genetic_relatedness_test, phen_test), batch_size=args.batch_size, shuffle=True)
 
     # define model
-    model = Fusion(snp_train.size()[-1], genetic_relatedness_train.size()[-1],
-                   p_snp_upper=args.p_ve_upper,
-                   p_snp_lower=args.p_ve_lower,
-                   p_genetic_relatedness=args.p_genetic_relatedness,
-                   p_fusion=args.p_fusion
-                   )
+    if args.windows_mechanism == 0:
+        model = NormalFusion(snp_train.size()[-1], genetic_relatedness_train.size()[-1],
+                      p_snp_upper = args.p_ve_upper,
+                      p_snp_lower = args.p_ve_lower,
+                      p_genetic_relatedness =  args.p_genetic_relatedness,
+                      p_fusion = args.p_fusion,
+                      stride = args.stride
+                      )
+    elif args.windows_mechanism == 1:
+        model = ChrFusion(genetic_relatedness_train.size()[-1],
+                      p_snp_upper = args.p_ve_upper,
+                      p_snp_lower = args.p_ve_lower,
+                      p_genetic_relatedness =  args.p_genetic_relatedness,
+                      p_fusion = args.p_fusion,
+                      windows = args.windows_size,
+                      count = count,
+                     stride = args.stride
+        )
+    else:
+        model = NormalFusion(snp_train.size()[-1], genetic_relatedness_train.size()[-1],
+                             p_snp_upper=args.p_ve_upper,
+                             p_snp_lower=args.p_ve_lower,
+                             p_genetic_relatedness =args.p_genetic_relatedness,
+                             p_fusion=args.p_fusion,
+                             stride=args.stride
+                             )
+
     loss_fn = nn.L1Loss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=args.factor,
-                                                           patience=args.patience)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=args.factor, patience=args.patience)
+
 
     k = args.k
     best_models = []
@@ -146,8 +167,7 @@ if __name__ == '__main__':
 
             optimizer.zero_grad()
             x1_output_train, x2_output_train, fusion_output_train = model(x1_train, x2_train)
-            loss = loss_fn(x1_output_train, y_train) + loss_fn(x2_output_train, y_train) + loss_fn(fusion_output_train,
-                                                                                                   y_train)
+            loss = loss_fn(x1_output_train, y_train) + loss_fn(x2_output_train, y_train) + loss_fn(fusion_output_train, y_train)
             loss.backward()
             optimizer.step()
 
@@ -194,12 +214,13 @@ if __name__ == '__main__':
                 pass
 
         # evaluate contribution
-        total_snp_contribution, total_genetic_relatedness_contribution = evaluate_contribution(model, pca_snp,
-                                                                                               pca_genetic_relatedness)
+        total_snp_contribution, total_genetic_relatedness_contribution = evaluate_contribution(model, pca_snp, pca_genetic_relatedness)
         total_snp_contribution_ls.append(total_snp_contribution)
         total_genetic_relatedness_contribution_ls.append(total_genetic_relatedness_contribution)
     # log
     write_contribution(total_snp_contribution_ls, total_genetic_relatedness_contribution_ls)
+
+
 
     # test
     test_r2_scores = []
@@ -221,3 +242,4 @@ if __name__ == '__main__':
         for i, score in enumerate(test_r2_scores):
             ff.write(f'Test R2 Score {i + 1}: {score}\n')
         ff.write(f'Mean Test R2 Score: {np.mean(test_r2_scores)}\n')
+

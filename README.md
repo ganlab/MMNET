@@ -37,7 +37,7 @@ pip install -r requirements.txt
 
 ### Embedding Siamese to generate genetic relatedness
 
-- To generate the genetic relatedness , use the following command. The model's dropout rate is set to `p`, and after training for `epoch` iterations, the genetic relatedness is constructed.
+- To generate the genetic relatedness , use the following command. The model's dropout rate is set to `p`, and after training for `epoch` iterations, the genetic_relatedness is constructed.
 
   ```python
   python generate_genetic_relatedness.py [parameters]
@@ -53,7 +53,9 @@ pip install -r requirements.txt
       --weight_decay    # L2 regularization strength to prevent overfitting
       --factor  # Factor by which the learning rate is reduced when performance plateaus
       --patience    # Number of consecutive epochs without improvement before reducing the learning rate
-      --genetic_relatedness_path    # Path to save the generated genetic_relatedness
+      --genetic_relatedness_path    # Path to save the generated genetic relatedness
+      --windows_mechanism   # Windows mechanism 0: don't use windows_mechanism, 1: windows_mechanism by chromosome
+      --windows_chr   # the number of chromosomes in a window
   ```
   
   Although we provide recommended [parameter settings](save/parameter_to_generate_genetic_relatedness.md), considering differences in hardware, users are advised to carefully determine these parameters based on error variations during training. The constructed genetic_relatedness will have a significant impact on the prediction performance of MMNet.
@@ -71,12 +73,12 @@ pip install -r requirements.txt
       --epoch	# Number of iterations
       --p_ve_upper # The dropout rate for the upper branch of the VE
       --p_ve_lower # The dropout rate for the lower branch of the VE 
-      --p_genetic_relatedness      # The dropout rate for the ESN 
+      --p_genetic_relatedness       # The dropout rate for the ESN 
       --p_fusion    # The dropout rate for the Fusion module
       --k 	 # The number of top-performing models (based on validation performance) to average for evaluation
       --stride      # The stride for the first convolutional layer in the upper branch of the VE
       --genotype_path  # Path to the genotype data file (CSV format)
-      --genetic_relatedness_path    # Path to the generated genetic_relatedness
+      --genetic_relatedness_path    # Path to the generated genetic relatedness
       --phenotype_path  # Path to the phenotype data file (CSV format)
       --train_val_ids_path # Path to the directory containing training, validation, and test set indices
       --batch_size  # Number of samples per batch during training
@@ -85,11 +87,13 @@ pip install -r requirements.txt
       --factor   # Factor by which the learning rate is reduced when performance plateaus
       --patience # Number of consecutive epochs without improvement before reducing the learning rate
       --monitor  # The metric to monitor ("train_loss"or "val_loss")
+      --windows_mechanism   # Windows mechanism 0: don't use windows_mechanism, 1: windows_mechanism by chromosome
+      --windows_chr   # the number of chromosomes in a window
   ```
 
 ​	Although we provide recommended [parameter settings](save/parameter_to_train_MMNet.md), considering differences in hardware, users are advised to carefully determine these parameters based on error variations during training. 
 
-​	**Tips:** Different stride parameter values, when combined with different Genotype files, result in varying data dimensions. Please adjust the parameters in the upper branch of the VE module `(models/ve_embedding.py)` according to the actual situation.
+​	**Tips:** Different stride parameter values, when combined with different Genotype files, result in varying data dimensions. Please adjust the parameters in the upper branch of the VE module `(models/*/ve_embedding.py)` according to the actual situation.
 
 ### Acknowledgements
 
