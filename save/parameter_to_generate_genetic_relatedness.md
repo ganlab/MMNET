@@ -17,4 +17,4 @@
   | plant height          | ld = 0.1 --> [140, 150]<br />ld = 0.2 -->  [80, 90]<br />ld = 0.3  --> [80, 90]<br />ld = 0.4 -->  [70, 80]<br />ld = 0.5 -->  [90, 100] | ld = 0.1 --> p = 0.8<br />ld = 0.2 --> p = 0.8<br />ld = 0.3  -->p = 0.8<br />ld = 0.4 --> p = 0.7<br />ld = 0.5 --> p = 0.7 |
   | grain protein content | ld = 0.1 --> [90, 100]<br />ld = 0.2 -->  [125, 135]<br />ld = 0.3  --> [135, 145]<br />ld = 0.4 -->  [120, 130]<br />ld = 0.5 -->  [100, 110] | ld = 0.1 --> p = 0.9<br />ld = 0.2 --> p = 0.9<br />ld = 0.3  -->p = 0.9<br />ld = 0.4 --> p = 0.8<br />ld = 0.5 --> p = 0.8 |
 
-  **Tips:** We recommend testing multiple genetic_relatedness in different prediction tasks to assess their impact on MMNet, thereby enhancing the model's stability and robustness.
+  **Tips:** We recommend testing multiple genetic relatedness in different prediction tasks to assess their impact on MMNet, thereby enhancing the model's stability and robustness.
