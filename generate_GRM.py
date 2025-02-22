@@ -67,7 +67,7 @@ if __name__ == '__main__':
 
     # training parameters
     parser.add_argument("--epoch", type=int, default=30, help = "Number of iterations")
-    parser.add_argument("--p", typed=float, default=0.8, help = "Dropout rate")
+    parser.add_argument("--p", type=float, default=0.8, help = "Dropout rate")
     parser.add_argument("--batch_size", type=int, default=128, help = "Number of samples per batch during training")
     parser.add_argument("--lr", type=float, default=0.01, help = "Initial learning rate for the optimizer")
     parser.add_argument("--weight_decay", type=float, default=5e-4, help = "L2 regularization strength to prevent overfitting")
