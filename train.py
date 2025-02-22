@@ -32,7 +32,7 @@ def split_train_val_test(data, train_ids, val_ids, test_ids):
 
 
 def get_data(genotype_path, grm_path, phenotype_path, train_val_ids_path):
-    genotype = pd.read_csv(genotype_path, index_col=0).iloc[:100, :100]
+    genotype = pd.read_csv(genotype_path, index_col=0)
     grm = pd.read_csv(grm_path, index_col=0)
     phenotype = pd.read_csv(phenotype_path, index_col=0)
     with open(train_val_ids_path + "train_ids.txt", 'r') as f:
