@@ -1,6 +1,6 @@
 import torch
 from ve_embedding import *
-from esn_embedding import *
+from genetic_relatedness_embedding import *
 
 
 class Fusion(nn.Module):
