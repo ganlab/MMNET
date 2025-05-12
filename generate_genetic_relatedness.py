@@ -23,7 +23,7 @@ config = json.load(open('configs/ESN.json'))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="ESN of MMNet")
-    parser.add_argument("--phenotype", type=str, default="grainlength", help="The name of the phenotype")
+    parser.add_argument("--phenotype", type=str, default="default", help="The name of the phenotype")
 
     parser.add_argument("--windows_mechanism", type=int, default=0,
                         help="Windows mechanism 0: don't use windows mechanism, 1: windows mechanism by chromosome")
