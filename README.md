@@ -22,7 +22,7 @@ pip install -r requirements.txt
   ```python
   + data
       + gene
-      	++ Genotype.csv
+      	++ genotype.csv
       + phen 
        	++ phenotype.csv
       + splits
