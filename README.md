@@ -73,9 +73,37 @@ pip install -r requirements.txt
 
 
 
+### Transfer Learning
+
+- To apply transfer learning, you can fine-tune a pre-trained model by selectively freezing and unfreezing specific layers. The following code snippet demonstrates how to configure the model after loading a pre-trained model:
+
+  ```python
+  # Freeze all parameters in the model
+  for param in model.parameters():
+      param.requires_grad = False
+  
+  # Unfreeze 
+  model.variation_lower.embedding.requires_grad_(True)
+  model.variation_upper.ve[0].requires_grad_(True)
+  
+  # Unfreeze 
+  for param in model.variation_output.parameters():
+      param.requires_grad = True
+  for param in model.gr_output.parameters():
+      param.requires_grad = True
+  for param in model.fusion.parameters():
+      param.requires_grad = True
+  ```
+
+  ##### Explanation
+
+  - **Freezing the model**: Setting `requires_grad = False` for all parameters prevents them from being updated during training, preserving the pre-trained weights.
+  - **Selective unfreezing**: Specific layers are set to `requires_grad = True` to allow fine-tuning.
+  - Ensure the pre-trained model is loaded before applying these settings.
+
 ### Acknowledgements
 
-This work is based on [pytorch](https://pytorch.org/) ,  [scikit-learn](https://scikit-learn.org/),  and [plink](https://www.cog-genomics.org/plink/). The project is developed by following author(s) and supervised by Prof. Xiangchao Gan(gan@njau.edu.cn)
+This work is based on [pytorch](https://pytorch.org/) ,  [scikit-learn](https://scikit-learn.org/),  and [plink](https://www.cog-genomics.org/plink/). The project is developed by following author and supervised by Prof. Xiangchao Gan(gan@njau.edu.cn)
 
 Authors:
 
