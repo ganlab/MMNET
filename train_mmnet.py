@@ -28,7 +28,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     device = args.device
 
-    train_dataloader, val_dataloader, test_dataloader, ggr, count = get_data_for_mment(f"data/phen/grainlength.csv",
+    train_dataloader, val_dataloader, test_dataloader, ggr, count = get_data_for_mment(f"data/phen/{args.phenotype}.csv",
                                                                                        batch_size=config[args.phenotype]['batch size'],)
 
     ve_size = ggr[0].shape[1]
